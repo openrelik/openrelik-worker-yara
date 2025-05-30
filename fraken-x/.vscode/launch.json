@@ -1,0 +1,65 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'fraken_x'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=fraken-x"
+                ],
+                "filter": {
+                    "name": "fraken_x",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'fraken-x'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=fraken-x",
+                    "--package=fraken-x"
+                ],
+                "filter": {
+                    "name": "fraken-x",
+                    "kind": "bin"
+                }
+            },
+            "args": ["--folder", "/tmp", "/home/fryy/Code/signature-base"],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'fraken-x'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=fraken-x",
+                    "--package=fraken-x"
+                ],
+                "filter": {
+                    "name": "fraken-x",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}
