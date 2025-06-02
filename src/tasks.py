@@ -164,11 +164,11 @@ def command(
 
     folders_and_files = []
     for input_file in input_files:
-        if 'internal_path' not in input_file:
-            logger.warning("Skipping file %s as it does not have an internal path", input_file)
+        if 'path' not in input_file:
+            logger.warning("Skipping file %s as it does not have an path", input_file)
             continue
         folders_and_files.append('--folder')
-        folders_and_files.append(input_file.get('internal_path'))
+        folders_and_files.append(input_file.get('path'))
 
     cmd = ['fraken'] + folders_and_files + [f'{all_yara.path}']
     with open(fraken_output.path, 'w+', encoding="utf-8") as log:
