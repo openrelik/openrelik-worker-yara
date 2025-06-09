@@ -49,7 +49,6 @@ TASK_METADATA = {
             "type": "textarea",
             "required": False,
         },
-        # TODO(fryy): Option to mount input file/s ?
     ],
 }
 
