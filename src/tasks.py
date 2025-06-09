@@ -49,6 +49,14 @@ TASK_METADATA = {
             "type": "textarea",
             "required": False,
         },
+        {
+            "name": "mount_disk_images",
+            "label": "Mount disk images",
+            "description": "If checked, the worker will try to mount disk images and scan the files inside the disk image.",
+            "type": "checkbox",
+            "required": True,
+            "default_value": False,
+        },
     ],
 }
 
@@ -131,6 +139,7 @@ def command(
     all_patterns = ""
     global_yara = task_config.get("Global Yara rules", "")
     manual_yara = task_config.get("Manual Yara rules", "")
+    mount_disk_images = task_config.get("mount_disk_images", False)
 
     if not global_yara and not manual_yara:
         raise RuntimeError(
@@ -192,7 +201,7 @@ def command(
 
             input_file_path = input_file.get("path")
             # Check if disk image, mount and add mountpoints to scan
-            if is_disk_image(input_file):
+            if mount_disk_images and is_disk_image(input_file):
                 bd = BlockDevice(input_file_path, min_partition_size=1)
                 bd.setup()
                 mountpoints = bd.mount()
