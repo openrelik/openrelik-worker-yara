@@ -8,7 +8,7 @@ This worker scans input files or folders with Yara rules. It sources the rules f
 
 OpenRelik yara worker can be installed by using the pre-build Docker image.
 
-**Note on Privileges:** This worker requires `privileged` mode capabilities and the `/dev/` volume mapped to perform necessary mounting operations (e.g., mounting disk images). Be aware of the security implications of granting these privileges.
+**Note on Privileges:** If you would like this worker to support mounting disk images this worker requires `privileged` mode capabilities and the `/dev/` volume mapped to perform necessary mounting operations (e.g., mounting disk images). Be aware of the security implications of granting these privileges.
 
 ### Using Pre-built Docker Image
 
@@ -18,7 +18,6 @@ Update the `docker-compose.yml` to include `openrelik-worker-yara`.
 openrelik-worker-yara:
   container_name: openrelik-worker-yara
   image: ghcr.io/openrelik/openrelik-worker-yara:${OPENRELIK_WORKER_YARA_VERSION}
-  platform: linux/amd64
   privileged: true
   restart: always
   environment:
@@ -30,17 +29,12 @@ openrelik-worker-yara:
 ```
 
 
-## Building, pushing and running fraken-x Docker image
-The fraken-x source and container is build seperatly to keep the openrelik-worker-yara build independent and fast. The image is available at `ghcr.io/openrelik/fraken-x`
+## Building and running fraken-x Docker image
+The fraken-x source and container is build separately to keep the openrelik-worker-yara build independent and fast. The image is available at `ghcr.io/openrelik/fraken-x` and can be used standalone.
 
 Build
 ```
 $ docker build -t ghcr.io/openrelik/fraken-x -f Dockerfile.fraken .
-```
-
-Push
-```
-$ docker push ghcr.io/openrelik/fraken-x
 ```
 
 Run

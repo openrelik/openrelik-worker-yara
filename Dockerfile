@@ -42,7 +42,6 @@ RUN poetry install && rm -rf $POETRY_CACHE_DIR
 ENV VIRTUAL_ENV=/app/.venv PATH="/openrelik/.venv/bin:$PATH"
 
 COPY --from=ghcr.io/openrelik/fraken-x /app/fraken-x /bin/fraken
-# COPY --from=ghcr.io/openrelik/fraken-x /app/fraken-x /bin/fraken
 
 # Default command if not run from docker-compose (and command being overidden)
 CMD ["celery", "--app=src.tasks", "worker", "--task-events", "--concurrency=4", "--loglevel=INFO"]
