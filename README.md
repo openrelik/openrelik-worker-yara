@@ -28,6 +28,19 @@ openrelik-worker-yara:
   command: "celery --app=src.app worker --task-events --concurrency=4 --loglevel=INFO -Q openrelik-worker-yara"
 ```
 
+## Loading Yara rules
+The worker can be loaded with yara rules in 2 different ways.
+1. Through the text input fiels shown in the UI
+2. Through the folder path input field shown in the UI
+
+The second option can be used to bootstrap persistent default rules. As shown above the shared volume is mapped into the container as `/usr/share/openrelik/data`. You can create a subfolder called `yara` there and bootstrap it with e.g. below ruleset from [Florian Roth](https://github.com/Neo23x0). 
+```
+mkdir -p ./data/yara
+cd ./data/yara
+git clone --depth 1 https://github.com/Neo23x0/signature-base.git
+```
+
+When running the worker you set the folder path to `/usr/share/openrelik/data/yara/` and it will use the rules.
 
 ## Building and running fraken-x Docker image
 The fraken-x source and container is build separately to keep the openrelik-worker-yara build independent and fast. The image is available at `ghcr.io/openrelik/fraken-x` and can be used standalone.
