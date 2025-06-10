@@ -161,7 +161,7 @@ def command(
                     logger.debug("Reading rule from %s", rule_file)
                     all_patterns += rf.read()
                     total_rules_read += 1
-    logger.info(f"Read {total_rules_read} rules")
+    logger.info(f"Read {total_rules_read} rule files.")
 
     if manual_yara:
         logger.info("Manual rules provided, added manual Yara rules")
