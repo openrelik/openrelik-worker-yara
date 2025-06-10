@@ -1,3 +1,5 @@
+[![codecov](https://codecov.io/gh/openrelik/openrelik-worker-yara/graph/badge.svg?token=IjJh9h02SS)](https://codecov.io/gh/openrelik/openrelik-worker-yara)
+
 # Yara scanner OpenRelik worker
 
 ## Overview
