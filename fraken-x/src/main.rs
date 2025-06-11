@@ -266,7 +266,7 @@ fn main() {
     let path_vec = cli.testorscan.folder.expect("Needs a path");
 
     for path in path_vec {
-        let joined_path = path.join("/etc/passwd");
+        let joined_path = path.join("etc/passwd");
         let full_folder_path = joined_path.to_str().unwrap_or("");
         eprintln!("[+] Parsing /etc/passwd under {}", full_folder_path);
         let users = userid::get_usernames_from_passwd(full_folder_path).unwrap_or(HashMap::new());
