@@ -1,13 +1,3 @@
-FROM rust:alpine AS fraken-builder
-
-WORKDIR /app
-
-RUN apk add --no-cache musl-dev
-
-COPY fraken-x/ .
-
-RUN cargo build --release
-
 # Use the official Docker Hub Ubuntu base image
 FROM ubuntu:24.04 AS openrelik-builder
 
@@ -18,7 +8,11 @@ RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selectio
 # Install poetry and any other dependency that your worker needs.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-poetry git \
-    # Add your dependencies here
+    # Mount dependencies
+    sudo \
+    fdisk \
+    qemu-utils \
+    ntfs-3g \
     && rm -rf /var/lib/apt/lists/*
 
 # Configure poetry
@@ -29,9 +23,9 @@ ENV POETRY_NO_INTERACTION=1 \
 
 # Configure debugging
 ARG OPENRELIK_PYDEBUG
-ENV OPENRELIK_PYDEBUG ${OPENRELIK_PYDEBUG:-0}
+ENV OPENRELIK_PYDEBUG=${OPENRELIK_PYDEBUG:-0}
 ARG OPENRELIK_PYDEBUG_PORT
-ENV OPENRELIK_PYDEBUG_PORT ${OPENRELIK_PYDEBUG_PORT:-5678}
+ENV OPENRELIK_PYDEBUG_PORT=${OPENRELIK_PYDEBUG_PORT:-5678}
 
 # Set working directory
 WORKDIR /openrelik
@@ -47,7 +41,7 @@ COPY . ./
 RUN poetry install && rm -rf $POETRY_CACHE_DIR
 ENV VIRTUAL_ENV=/app/.venv PATH="/openrelik/.venv/bin:$PATH"
 
-COPY --from=fraken-builder /app/target/release/fraken-x /bin/fraken
+COPY --from=ghcr.io/openrelik/fraken-x /app/fraken-x /bin/fraken
 
 # Default command if not run from docker-compose (and command being overidden)
 CMD ["celery", "--app=src.tasks", "worker", "--task-events", "--concurrency=4", "--loglevel=INFO"]

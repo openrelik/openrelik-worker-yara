@@ -19,9 +19,10 @@ import os
 import subprocess
 from dataclasses import dataclass
 
-from openrelik_worker_common.file_utils import create_output_file
-from openrelik_worker_common.reporting import MarkdownTable, Priority, Report
-from openrelik_worker_common.task_utils import create_task_result, get_input_files
+from .openrelik_worker_common.file_utils import create_output_file, is_disk_image
+from .openrelik_worker_common.mount_utils import BlockDevice
+from .openrelik_worker_common.reporting import MarkdownTable, Priority, Report
+from .openrelik_worker_common.task_utils import create_task_result, get_input_files
 
 from .app import celery
 
@@ -48,9 +49,17 @@ TASK_METADATA = {
             "type": "textarea",
             "required": False,
         },
-        # TODO(fryy): Option to mount input file/s ?
+        {
+            "name": "mount_disk_images",
+            "label": "Mount disk images",
+            "description": "If checked, the worker will try to mount disk images and scan the files inside the disk image.",
+            "type": "checkbox",
+            "required": True,
+            "default_value": False,
+        },
     ],
 }
+
 
 def safe_list_get(l, index, default):
     """Small helper function to safely get an item from a list."""
@@ -58,6 +67,7 @@ def safe_list_get(l, index, default):
         return l[index]
     except IndexError:
         return default
+
 
 @dataclass
 class YaraMatch:
@@ -82,14 +92,21 @@ def generate_report_from_matches(matches: list[YaraMatch]) -> Report:
     """
     report = Report("Yara scan report")
     matches_section = report.add_section()
-    matches_section.add_paragraph(
-        "List of Yara matches found in the scanned files."
-    )
+    matches_section.add_paragraph("List of Yara matches found in the scanned files.")
     if matches:
         report.priority = Priority.CRITICAL
     match_table = MarkdownTable(["filepath", "hash", "rule", "desc", "ref", "score"])
     for match in matches:
-        match_table.add_row([match.filepath, match.hash, match.rule, match.desc, match.ref, str(match.score)])
+        match_table.add_row(
+            [
+                match.filepath,
+                match.hash,
+                match.rule,
+                match.desc,
+                match.ref,
+                str(match.score),
+            ]
+        )
 
     matches_section.add_table(match_table)
 
@@ -122,20 +139,29 @@ def command(
     all_patterns = ""
     global_yara = task_config.get("Global Yara rules", "")
     manual_yara = task_config.get("Manual Yara rules", "")
+    mount_disk_images = task_config.get("mount_disk_images", False)
 
     if not global_yara and not manual_yara:
-        raise RuntimeError("At least one of Global and/or Manual Yara rules must be provided")
+        raise RuntimeError(
+            "At least one of Global and/or Manual Yara rules must be provided"
+        )
 
-    for rule_path in global_yara.split('\n'):
+    total_rules_read = 0
+    for rule_path in global_yara.split("\n"):
         if os.path.isfile(rule_path):
             with open(rule_path, encoding="utf-8") as rf:
-                logger.info("Reading rule from %s", rule_path)
+                logger.debug("Reading rule from %s", rule_path)
                 all_patterns += rf.read()
+                total_rules_read += 1
         if os.path.isdir(rule_path):
-            for rule_file in glob.glob(os.path.join(rule_path, '**/*.yar*'), recursive=True):
+            for rule_file in glob.glob(
+                os.path.join(rule_path, "**/*.yar*"), recursive=True
+            ):
                 with open(rule_file, encoding="utf-8") as rf:
-                    logger.info("Reading rule from %s", rule_file)
+                    logger.debug("Reading rule from %s", rule_file)
                     all_patterns += rf.read()
+                    total_rules_read += 1
+    logger.info(f"Read {total_rules_read} rule files.")
 
     if manual_yara:
         logger.info("Manual rules provided, added manual Yara rules")
@@ -158,24 +184,55 @@ def command(
 
     input_files_map = {}
     for input_file in input_files:
-        input_files_map[input_file.get(
-            "path", input_file.get("uuid", "UNKNOWN FILE"))] = input_file.get(
-                "display_name", "UNKNOWN FILE NAME")
+        input_files_map[
+            input_file.get("path", input_file.get("uuid", "UNKNOWN FILE"))
+        ] = input_file.get("display_name", "UNKNOWN FILE NAME")
 
-    folders_and_files = []
-    for input_file in input_files:
-        if 'path' not in input_file:
-            logger.warning("Skipping file %s as it does not have an path", input_file)
-            continue
-        folders_and_files.append('--folder')
-        folders_and_files.append(input_file.get('path'))
+    try:
+        folders_and_files = []
+        bd = None
+        disks_mounted = []
+        for input_file in input_files:
+            if "path" not in input_file:
+                logger.warning(
+                    "Skipping file %s as it does not have an path", input_file
+                )
+                continue
 
-    cmd = ['fraken'] + folders_and_files + [f'{all_yara.path}']
-    with open(fraken_output.path, 'w+', encoding="utf-8") as log:
-        process = subprocess.Popen(cmd, stdout=log)
-        process.wait()
+            input_file_path = input_file.get("path")
+            # Check if disk image, mount and add mountpoints to scan
+            if mount_disk_images and is_disk_image(input_file):
+                bd = BlockDevice(input_file_path, min_partition_size=1)
+                bd.setup()
+                mountpoints = bd.mount()
+                disks_mounted.append(bd)
 
-    with open(fraken_output.path, 'r', encoding="utf-8") as json_file:
+                if not mountpoints:
+                    logger.info(
+                        "No mountpoints returned for input file %s",
+                        input_file.get("display_name"),
+                    )
+                for mountpoint in mountpoints:
+                    folders_and_files.append("--folder")
+                    folders_and_files.append(mountpoint)
+            else:
+                folders_and_files.append("--folder")
+                folders_and_files.append(input_file_path)
+
+        cmd = ["fraken"] + folders_and_files + [f"{all_yara.path}"]
+        logger.debug(f"fraken-x command: {cmd}")
+        with open(fraken_output.path, "w+", encoding="utf-8") as log:
+            process = subprocess.Popen(cmd, stdout=log)
+            process.wait()
+    except RuntimeError as e:
+        logger.error("Error encountered: %s", str(e))
+    finally:
+        for blockdevice in disks_mounted:
+            if blockdevice:
+                logger.debug(f"Unmounting image {blockdevice.image_path}")
+                blockdevice.umount()
+
+    with open(fraken_output.path, "r", encoding="utf-8") as json_file:
         matches_list_list = list(json_file)
 
         for matches_list in matches_list_list:
@@ -184,12 +241,14 @@ def command(
             for match in matches:
                 all_matches.append(
                     YaraMatch(
-                        filepath=input_files_map.get(match['ImagePath'], match['ImagePath']),
-                        hash=match['SHA256'],
-                        rule=match['Signature'],
-                        desc=match['Description'],
-                        ref=match['Reference'],
-                        score=match['Score'],
+                        filepath=input_files_map.get(
+                            match["ImagePath"], match["ImagePath"]
+                        ),
+                        hash=match["SHA256"],
+                        rule=match["Signature"],
+                        desc=match["Description"],
+                        ref=match["Reference"],
+                        score=match["Score"],
                     )
                 )
 
