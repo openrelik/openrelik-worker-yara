@@ -253,7 +253,7 @@ def command(
                 )
 
     report = generate_report_from_matches(all_matches)
-    report_file = create_output_file(output_path, display_name="report.md")
+    report_file = create_output_file(output_path, display_name="yara-scan-report.md",data_type="yara:yara-scan:report")
     with open(report_file.path, "w", encoding="utf-8") as fh:
         fh.write(report.to_markdown())
 
