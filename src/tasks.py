@@ -18,6 +18,9 @@ import os
 import subprocess
 from dataclasses import dataclass
 
+from celery import signals
+from celery.utils.log import get_task_logger
+
 from openrelik_common.logging import Logger
 from openrelik_worker_common.file_utils import create_output_file, is_disk_image
 from openrelik_worker_common.mount_utils import BlockDevice
@@ -25,21 +28,9 @@ from openrelik_worker_common.reporting import MarkdownTable, Priority, Report
 from openrelik_worker_common.task_utils import create_task_result, get_input_files
 
 from .app import celery
-from celery import signals
-from celery.utils.log import get_task_logger
-
 
 log_root = Logger()
 logger = log_root.get_logger(__name__, get_task_logger(__name__))
-
-
-@signals.task_prerun.connect
-def on_task_prerun(sender, task_id, task, args, kwargs, **_):
-    log_root.bind(
-        task_id=task_id,
-        task_name=task.name,
-        worker_name=TASK_METADATA.get("display_name"),
-    )
 
 
 TASK_NAME = "openrelik-worker-yara.tasks.yara-scan"
@@ -72,6 +63,15 @@ TASK_METADATA = {
         },
     ],
 }
+
+
+@signals.task_prerun.connect
+def on_task_prerun(sender, task_id, task, args, kwargs, **_):
+    log_root.bind(
+        task_id=task_id,
+        task_name=task.name,
+        worker_name=TASK_METADATA.get("display_name"),
+    )
 
 
 def safe_list_get(l, index, default):
