@@ -14,20 +14,33 @@
 
 import glob
 import json
-import logging
 import os
 import subprocess
 from dataclasses import dataclass
 
+from openrelik_common.logging import Logger
 from openrelik_worker_common.file_utils import create_output_file, is_disk_image
 from openrelik_worker_common.mount_utils import BlockDevice
 from openrelik_worker_common.reporting import MarkdownTable, Priority, Report
 from openrelik_worker_common.task_utils import create_task_result, get_input_files
 
 from .app import celery
+from celery import signals
+from celery.utils.log import get_task_logger
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+
+log_root = Logger()
+logger = log_root.get_logger(__name__, get_task_logger(__name__))
+
+
+@signals.task_prerun.connect
+def on_task_prerun(sender, task_id, task, args, kwargs, **_):
+    log_root.bind(
+        task_id=task_id,
+        task_name=task.name,
+        worker_name=TASK_METADATA.get("display_name"),
+    )
+
 
 TASK_NAME = "openrelik-worker-yara.tasks.yara-scan"
 
@@ -134,6 +147,10 @@ def command(
     Returns:
         Base64-encoded dictionary containing task results.
     """
+
+    log_root.bind(workflow_id=workflow_id)
+    logger.debug(f"Starting {TASK_NAME} for workflow {workflow_id}")
+
     output_files = []
 
     all_patterns = ""
@@ -142,9 +159,9 @@ def command(
     mount_disk_images = task_config.get("mount_disk_images", False)
 
     if not global_yara and not manual_yara:
-        raise RuntimeError(
-            "At least one of Global and/or Manual Yara rules must be provided"
-        )
+        error_msg = "At least one of Global and/or Manual Yara rules must be provided"
+        logger.error(error_msg)
+        raise RuntimeError(error_msg)
 
     total_rules_read = 0
     for rule_path in global_yara.split("\n"):
@@ -168,9 +185,11 @@ def command(
         all_patterns += manual_yara
 
     if not all_patterns:
-        raise ValueError(
+        error_msg = (
             "No Yara rules were collected, provide Global and/or manual Yara rules"
         )
+        logger.error(error_msg)
+        raise ValueError(error_msg)
 
     all_yara = create_output_file(output_path, display_name="all.yara")
     with open(all_yara.path, "w", encoding="utf-8") as fh:
@@ -188,10 +207,10 @@ def command(
             input_file.get("path", input_file.get("uuid", "UNKNOWN FILE"))
         ] = input_file.get("display_name", "UNKNOWN FILE NAME")
 
+    disks_mounted = []
     try:
         folders_and_files = []
         bd = None
-        disks_mounted = []
         for input_file in input_files:
             if "path" not in input_file:
                 logger.warning(
@@ -222,8 +241,12 @@ def command(
         cmd = ["fraken"] + folders_and_files + [f"{all_yara.path}"]
         logger.debug(f"fraken-x command: {cmd}")
         with open(fraken_output.path, "w+", encoding="utf-8") as log:
-            process = subprocess.Popen(cmd, stdout=log)
+            process = subprocess.Popen(cmd, stdout=log, stderr=subprocess.PIPE)
             process.wait()
+            if process.stderr:
+                # Note: fraken-x uses the eprintln! Rust macro to print progress,
+                #       this outputs to stderr....
+                logger.info(f"fraken-x: {process.stderr.readlines()}")
     except RuntimeError as e:
         logger.error("Error encountered: %s", str(e))
     finally:
@@ -253,7 +276,11 @@ def command(
                 )
 
     report = generate_report_from_matches(all_matches)
-    report_file = create_output_file(output_path, display_name="yara-scan-report.md",data_type="yara:yara-scan:report")
+    report_file = create_output_file(
+        output_path,
+        display_name="yara-scan-report.md",
+        data_type="yara:yara-scan:report",
+    )
     with open(report_file.path, "w", encoding="utf-8") as fh:
         fh.write(report.to_markdown())
 
