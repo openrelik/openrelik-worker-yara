@@ -23,5 +23,12 @@ if os.getenv("OPENRELIK_PYDEBUG") == "1":
     start_debugger()
 
 REDIS_URL = os.getenv("REDIS_URL")
-celery = Celery(broker=REDIS_URL, backend=REDIS_URL, include=["src.tasks"])
+celery = Celery(
+    broker=REDIS_URL,
+    backend=REDIS_URL,
+    include=["src.tasks"],
+    worker_hijack_root_logger=False, # Disable Celery hijacking configured Python loggers.
+    worker_log_format="%(message)s",
+    worker_task_log_format="%(message)s",
+)
 redis_client = redis.Redis.from_url(REDIS_URL)
