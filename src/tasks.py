@@ -20,7 +20,6 @@ from dataclasses import dataclass
 
 from celery import signals
 from celery.utils.log import get_task_logger
-
 from openrelik_common.logging import Logger
 from openrelik_worker_common.file_utils import create_output_file, is_disk_image
 from openrelik_worker_common.mount_utils import BlockDevice
@@ -171,9 +170,7 @@ def command(
                 all_patterns += rf.read()
                 total_rules_read += 1
         if os.path.isdir(rule_path):
-            for rule_file in glob.glob(
-                os.path.join(rule_path, "**/*.yar*"), recursive=True
-            ):
+            for rule_file in glob.glob(os.path.join(rule_path, "**/*.yar*"), recursive=True):
                 with open(rule_file, encoding="utf-8") as rf:
                     logger.debug("Reading rule from %s", rule_file)
                     all_patterns += rf.read()
@@ -185,9 +182,7 @@ def command(
         all_patterns += manual_yara
 
     if not all_patterns:
-        error_msg = (
-            "No Yara rules were collected, provide Global and/or manual Yara rules"
-        )
+        error_msg = "No Yara rules were collected, provide Global and/or manual Yara rules"
         logger.error(error_msg)
         raise ValueError(error_msg)
 
@@ -203,9 +198,9 @@ def command(
 
     input_files_map = {}
     for input_file in input_files:
-        input_files_map[
-            input_file.get("path", input_file.get("uuid", "UNKNOWN FILE"))
-        ] = input_file.get("display_name", "UNKNOWN FILE NAME")
+        input_files_map[input_file.get("path", input_file.get("uuid", "UNKNOWN FILE"))] = (
+            input_file.get("display_name", "UNKNOWN FILE NAME")
+        )
 
     disks_mounted = []
     try:
@@ -213,9 +208,7 @@ def command(
         bd = None
         for input_file in input_files:
             if "path" not in input_file:
-                logger.warning(
-                    "Skipping file %s as it does not have an path", input_file
-                )
+                logger.warning("Skipping file %s as it does not have an path", input_file)
                 continue
 
             input_file_path = input_file.get("path")
@@ -241,6 +234,7 @@ def command(
         cmd = ["fraken"] + folders_and_files + [f"{all_yara.path}"]
         logger.debug(f"fraken-x command: {cmd}")
         with open(fraken_output.path, "w+", encoding="utf-8") as log:
+            self.send_event("task-progress")
             process = subprocess.Popen(cmd, stdout=log, stderr=subprocess.PIPE)
             process.wait()
             if process.stderr:
@@ -264,9 +258,7 @@ def command(
             for match in matches:
                 all_matches.append(
                     YaraMatch(
-                        filepath=input_files_map.get(
-                            match["ImagePath"], match["ImagePath"]
-                        ),
+                        filepath=input_files_map.get(match["ImagePath"], match["ImagePath"]),
                         hash=match["SHA256"],
                         rule=match["Signature"],
                         desc=match["Description"],
