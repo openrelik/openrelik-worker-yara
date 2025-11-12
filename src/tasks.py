@@ -20,6 +20,7 @@ from dataclasses import dataclass
 
 from celery import signals
 from celery.utils.log import get_task_logger
+from openrelik_common import telemetry
 from openrelik_common.logging import Logger
 from openrelik_worker_common.file_utils import create_output_file, is_disk_image
 from openrelik_worker_common.mount_utils import BlockDevice
@@ -149,6 +150,10 @@ def command(
 
     log_root.bind(workflow_id=workflow_id)
     logger.debug(f"Starting {TASK_NAME} for workflow {workflow_id}")
+
+    telemetry.add_attribute_to_current_span("input_files", input_files)
+    telemetry.add_attribute_to_current_span("task_config", task_config)
+    telemetry.add_attribute_to_current_span("workflow_id", workflow_id)
 
     output_files = []
 
