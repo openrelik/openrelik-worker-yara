@@ -171,13 +171,11 @@ def command(
     for rule_path in global_yara.split("\n"):
         if os.path.isfile(rule_path):
             with open(rule_path, encoding="utf-8") as rf:
-                logger.debug("Reading rule from %s", rule_path)
                 all_patterns += rf.read()
                 total_rules_read += 1
         if os.path.isdir(rule_path):
             for rule_file in glob.glob(os.path.join(rule_path, "**/*.yar*"), recursive=True):
                 with open(rule_file, encoding="utf-8") as rf:
-                    logger.debug("Reading rule from %s", rule_file)
                     all_patterns += rf.read()
                     total_rules_read += 1
     logger.info(f"Read {total_rules_read} rule files.")
