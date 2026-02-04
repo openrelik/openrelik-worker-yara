@@ -1,3 +1,9 @@
+> [!CAUTION]  
+> # NOTICE - DO NOT USE
+> This repository has been archived and moved to https://github.com/openrelik/openrelik-workers/}
+
+
+
 [![codecov](https://codecov.io/gh/openrelik/openrelik-worker-yara/graph/badge.svg?token=IjJh9h02SS)](https://codecov.io/gh/openrelik/openrelik-worker-yara)
 
 # Yara scanner OpenRelik worker
